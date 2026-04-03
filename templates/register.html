@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+
+<body>
+
+{% include 'header.html' %}
+
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+
+    <div class="card p-4 w-100" style="max-width: 800px;"> <!-- ✅ removed shadow -->
+
+        <h3 class="text-center mb-4">Create Account 🚀</h3>
+
+        <form method="POST">
+
+            <div class="row">
+
+                <!-- LEFT -->
+                <div class="col-md-6">
+
+                    <div class="mb-3">
+                        <label>Name</label>
+                        <input type="text" name="name" class="w-100" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Email</label>
+                        <input type="email" name="email" class="w-100" required>
+                    </div>
+
+                    <!-- PASSWORD -->
+                    <div class="mb-3">
+                        <label>Password</label>
+                        <div class="d-flex align-items-center">
+
+                            <input type="password" name="password" id="password" class="w-100" required>
+
+                            <span onclick="togglePassword()" style="cursor:pointer; margin-left:10px;">
+                                <i class="bi bi-eye" id="eyeIcon"></i>
+                            </span>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT -->
+                <div class="col-md-6">
+
+                    <div class="mb-3">
+                        <label>Role</label>
+                        <select name="role" class="w-100">
+                            <option value="student">Student</option>
+                            <option value="organizer">Organizer</option>
+                            <option value="admin">Admin</option>
+                            <option value="faculty">Faculty</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Department</label>
+                        <select name="department" class="w-100">
+                            <option value="Department of Computer Science and Engineering">CSE</option>
+                            <option value="Department of Biotechnology and Bioengineering">Biotech</option>
+                            <option value="Department of Business Management">BBA</option>
+                            <option value="Department of Humanities and Sciences">Humanities</option>
+                        </select>
+                    </div>
+
+                    <!-- ADMIN CODE -->
+                    <div class="mb-3">
+                        <label>Admin Code</label>
+                        <div class="d-flex align-items-center">
+
+                            <input type="password" name="admin_code" id="adminCode" class="w-100">
+
+                            <span onclick="toggleAdminCode()" style="cursor:pointer; margin-left:10px;">
+                                <i class="bi bi-eye" id="adminEyeIcon"></i>
+                            </span>
+
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- BUTTON -->
+            <button type="submit" class="btn w-100 mt-3">
+                <i class="bi bi-person-plus"></i> Register
+            </button>
+
+        </form>
+
+        <p class="text-center mt-3">
+            Already have an account? <a href="/login">Login</a>
+        </p>
+
+    </div>
+
+</div>
+
+<!-- 🔥 SCRIPT (UNCHANGED) -->
+<script>
+function togglePassword() {
+    let password = document.getElementById("password");
+    let icon = document.getElementById("eyeIcon");
+
+    if (password.type === "password") {
+        password.type = "text";
+        icon.classList.remove("bi-eye");
+        icon.classList.add("bi-eye-slash");
+    } else {
+        password.type = "password";
+        icon.classList.remove("bi-eye-slash");
+        icon.classList.add("bi-eye");
+    }
+}
+
+function toggleAdminCode() {
+    let adminCode = document.getElementById("adminCode");
+    let icon = document.getElementById("adminEyeIcon");
+
+    if (adminCode.type === "password") {
+        adminCode.type = "text";
+        icon.classList.remove("bi-eye");
+        icon.classList.add("bi-eye-slash");
+    } else {
+        adminCode.type = "password";
+        icon.classList.remove("bi-eye-slash");
+        icon.classList.add("bi-eye");
+    }
+}
+</script>
+
+</body>
+</html>

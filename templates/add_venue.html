@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Venue</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+
+    <style>
+        /* 🔥 SCROLLABLE DROPDOWN AREA */
+        .scroll-box {
+            max-height: 150px;
+            overflow-y: auto;           
+        }
+    </style>
+</head>
+
+<body> <!-- ✅ removed bg-light -->
+
+{% include 'header.html' %}
+
+<div class="container py-4">
+
+    <div class="row g-4 justify-content-center align-items-stretch">
+
+        <!-- ADD VENUE -->
+        <div class="col-12 col-md-5 d-flex">
+            <div class="card p-4 w-100 d-flex flex-column">
+
+                <h4 class="text-center mb-4">➕ Add Venue</h4>
+
+                <form method="POST" class="flex-grow-1 d-flex flex-column">
+
+                    <div class="mb-3">
+                        <label class="form-label">Venue Name</label>
+                        <input type="text" name="name" class="w-100" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Capacity</label>
+                        <input type="number" name="capacity" class="w-100" required>
+                    </div>
+
+                    <div class="mt-auto">
+                        <button type="submit" class="btn w-100">
+                            ➕ Add Venue
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+
+        <!-- DELETE VENUE -->
+        <div class="col-12 col-md-5 d-flex">
+            <div class="card p-4 w-100 d-flex flex-column">
+
+                <h4 class="text-center mb-4">🗑️ Delete Venue</h4>
+
+                <form method="POST" action="/delete_venue" class="flex-grow-1 d-flex flex-column">
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Venue</label>
+
+                        <!-- 🔥 SCROLL BOX -->
+                        <div class="scroll-box">
+                            <select name="venue_id" class="w-100" size="5" required>
+                                {% for venue in venues %}
+                                    <option value="{{ venue[0] }}">
+                                        {{ venue[1] }} (Capacity: {{ venue[2] }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                    </div>
+
+                    {% if not venues %}
+                        <p class="text-center text-muted mt-3">No venues available.</p>
+                    {% endif %}
+
+                    <div class="mt-auto">
+                        <button type="submit" class="btn w-100">
+                            ❌ Delete Venue
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Back -->
+    <div class="text-center mt-4">
+        <a href="/" class="btn">⬅ Back to Dashboard</a>
+    </div>
+
+</div>
+
+</body>
+</html>

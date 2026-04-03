@@ -1,0 +1,58 @@
+<!-- 🔥 LOADER -->
+<div id="loader">
+    <div class="spinner"></div>
+</div>
+
+<div class="top-bar">
+
+    <!-- LEFT -->
+    <div class="left-section">
+        <img src="/static/logo.png" alt="logo" class="logo">
+
+        <div>
+            <h5 class="mb-0">Institute of Advanced Research</h5>
+            <small>The University for Innovation</small>
+        </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-section">
+        <h5>IAR Event Management System</h5>
+    </div>
+
+</div>
+
+<!-- 🔥 SUCCESS POPUP -->
+<div id="successPopup" class="popup"></div>
+
+<!-- 🔥 LOADER SCRIPT -->
+<script>
+window.addEventListener("load", function(){
+    document.getElementById("loader").style.display = "none";
+});
+</script>
+
+<script>
+function showSuccess(message) {
+    let popup = document.getElementById("successPopup");
+    popup.innerText = message;
+
+    popup.style.display = "block";
+    popup.classList.add("show");
+
+    setTimeout(() => {
+        popup.classList.remove("show");
+        popup.style.display = "none";
+    }, 2000);
+}
+</script>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <script>
+            window.addEventListener("load", function() {
+                showSuccess("{{ messages[0] }}");
+            });
+        </script>
+    {% endif %}
+{% endwith %}

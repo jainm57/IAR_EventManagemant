@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Organizer Dashboard</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body> <!-- ✅ removed bg-light -->
+
+{% include 'header.html' %}
+
+<div class="container mt-5 text-center">
+
+    <h1 class="mb-4">Organizer Dashboard 👨‍💻</h1>
+
+    <div class="d-grid gap-3 col-6 mx-auto">
+
+        <a href="/create_event" class="btn btn-lg">
+            ➕ Create Event
+        </a>
+
+        <a href="/events" class="btn btn-lg">
+            🎉 View Events
+        </a>
+
+        <a href="/my_events" class="btn btn-lg">
+            📋 My Events
+        </a>
+
+        <a href="/admin_events" class="btn btn-lg">
+            ⚙️ Manage My Events
+        </a>
+
+        <a href="/logout" class="btn btn-lg">
+            🚪 Logout
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>
