@@ -156,7 +156,7 @@ def login():
             flash("Use your college email (@iar.ac.in) ❌")
             return redirect('/login')
 
-        # Check user in database
+        # Database check
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email=?", (email,))
@@ -177,7 +177,7 @@ def login():
             }
             session['otp'] = otp
 
-            # 🔥 EMAIL CONFIG (Render ENV)
+            # Email credentials (from Render)
             sender_email = os.environ.get("EMAIL_USER")
             sender_password = os.environ.get("EMAIL_PASS")
 
@@ -189,7 +189,8 @@ def login():
                 msg['From'] = sender_email
                 msg['To'] = email
 
-                server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+                # 🔥 Timeout added to prevent freezing
+                server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=5)
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
                 server.quit()
@@ -198,8 +199,9 @@ def login():
 
             except Exception as e:
                 print("Email error:", e)
-                flash("Error sending email ❌")
+                flash("OTP generated but email delayed. Check again 🔄")
 
+            # 🔥 Always redirect (no blocking)
             return redirect('/verify_otp')
 
         else:
