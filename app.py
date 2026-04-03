@@ -146,7 +146,6 @@ def register():
 
 
 @app.route('/login', methods=['GET', 'POST'])
-@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email'].strip().lower()
@@ -157,6 +156,7 @@ def login():
             flash("Use your college email (@iar.ac.in) ❌")
             return redirect('/login')
 
+        # Database check
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email=?", (email,))
@@ -164,8 +164,11 @@ def login():
         conn.close()
 
         if user and check_password_hash(user[3], password):
+
+            # Generate OTP
             otp = str(random.randint(100000, 999999))
 
+            # Store session
             session['temp_user'] = {
                 'id': user[0],
                 'role': user[4],
@@ -174,10 +177,30 @@ def login():
             }
             session['otp'] = otp
 
-            # 🔥 TEMP: Print OTP instead of email (Render safe)
-            print(f"\n=== OTP FOR {email}: {otp} ===\n")
+            # 🔥 GET EMAIL FROM ENV (SAFE)
+            sender_email = os.environ.get("EMAIL_USER")
+            sender_password = os.environ.get("EMAIL_PASS")
 
-            flash("OTP generated! Check logs/console 👨‍💻")
+            try:
+                msg = MIMEText(
+                    f"Hello {user[1]},\n\nYour OTP is: {otp}\n\nDo not share this code."
+                )
+                msg['Subject'] = 'IAR Event System - OTP Verification'
+                msg['From'] = sender_email
+                msg['To'] = email
+
+                server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+                server.quit()
+
+                flash("OTP sent to your email 📧")
+
+            except Exception as e:
+                print("Email error:", e)
+                print(f"OTP (fallback): {otp}")
+                flash("Email failed. Check logs 👨‍💻")
+
             return redirect('/verify_otp')
 
         else:
