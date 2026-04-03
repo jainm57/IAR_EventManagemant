@@ -146,12 +146,13 @@ def register():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email'].strip().lower()
         password = request.form['password']
 
-        # Enforce college domain restriction
+        # Email validation
         if not re.match(r'^[a-zA-Z0-9._%+-]+@iar\.ac\.in$', email):
             flash("Use your college email (@iar.ac.in) ❌")
             return redirect('/login')
@@ -163,10 +164,8 @@ def login():
         conn.close()
 
         if user and check_password_hash(user[3], password):
-            # Generate 6-digit verification code
             otp = str(random.randint(100000, 999999))
-            
-            # Store temporary session details instead of fully logging in
+
             session['temp_user'] = {
                 'id': user[0],
                 'role': user[4],
@@ -174,32 +173,13 @@ def login():
                 'email': email
             }
             session['otp'] = otp
-            
-            # Send OTP via SMTP
-            sender_email = "jainmprajapati@gmail.com"
-            sender_password = "doxwasesbczzqtgi"
-            
-            print(f"\n=====================================")
-            print(f"DEVELOPMENT MODE - OTP FOR {email}: {otp}")
-            print(f"=====================================\n")
-            
-            try:
-                msg = MIMEText(f"Hello {user[1]},\n\nYour login verification code is: {otp}\n\nDo not share this code with anyone.")
-                msg['Subject'] = 'IAR Event System - Login Verification Code'
-                msg['From'] = 'IAR Event Security'
-                msg['To'] = email
-                
-                server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
-                server.quit()
-                flash("Verification code sent to your email! 📧")
-            except Exception as e:
-                print(f"Email could not be sent. Continuing via terminal code. Error: {e}")
-                # Fallback to terminal output if credentials fail
-                flash("Email not configured. Check the terminal for your Verification Code! 👨‍💻")
 
+            # 🔥 TEMP: Print OTP instead of email (Render safe)
+            print(f"\n=== OTP FOR {email}: {otp} ===\n")
+
+            flash("OTP generated! Check logs/console 👨‍💻")
             return redirect('/verify_otp')
+
         else:
             flash("Invalid Credentials ❌")
             return redirect('/login')
