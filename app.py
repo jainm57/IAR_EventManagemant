@@ -156,7 +156,7 @@ def login():
             flash("Use your college email (@iar.ac.in) ❌")
             return redirect('/login')
 
-        # Database check
+        # Check user in database
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email=?", (email,))
@@ -177,7 +177,7 @@ def login():
             }
             session['otp'] = otp
 
-            # 🔥 GET EMAIL FROM ENV (SAFE)
+            # 🔥 EMAIL CONFIG (Render ENV)
             sender_email = os.environ.get("EMAIL_USER")
             sender_password = os.environ.get("EMAIL_PASS")
 
@@ -194,12 +194,11 @@ def login():
                 server.send_message(msg)
                 server.quit()
 
-                flash("OTP sent to your email 📧")
+                flash("Verification code sent to your email 📧")
 
             except Exception as e:
                 print("Email error:", e)
-                print(f"OTP (fallback): {otp}")
-                flash("Email failed. Check logs 👨‍💻")
+                flash("Error sending email ❌")
 
             return redirect('/verify_otp')
 
