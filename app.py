@@ -12,28 +12,39 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from flask import Flask, render_template, request, redirect, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
+if os.name == 'nt':  # Windows
+    DB_PATH = os.path.join(os.getcwd(), "database.db")
+else:  # Render (Linux)
+    DB_PATH = "/tmp/database.db"
+
+print("🔥 DB PATH:", DB_PATH)
+
 app = Flask(__name__)
-# In production, this should be stored securely in an environment variable
 app.secret_key = "secret123"
 
-# Initialize SQLite Database schema
+@app.before_request
+def before_request():
+    init_db()
+
 def init_db():
-    conn = sqlite3.connect('database.db')
+    print("🔥 Using DB:", DB_PATH)   # Debug line
+
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Users table
+    # USERS TABLE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
-            email TEXT,
+            email TEXT UNIQUE,
             password TEXT,
             role TEXT,
             department TEXT
         )
     ''')
 
-    # Events table
+    # EVENTS TABLE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +62,7 @@ def init_db():
         )
     ''')
 
-    # Event registration tracking
+    # REGISTRATIONS
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS registrations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +71,7 @@ def init_db():
         )
     ''')
 
-    # Available venues and capacities
+    # VENUES
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS venues (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,7 +80,7 @@ def init_db():
         )
     ''')
 
-    # Event attendance tracking
+    # ATTENDANCE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +88,27 @@ def init_db():
             student_id INTEGER
         )
     ''')
+
+    # ✅ COMMIT TABLE CREATION FIRST (IMPORTANT FIX)
+    conn.commit()
+
+    # ✅ CHECK IF USER EXISTS (SAFE)
+    cursor.execute("SELECT COUNT(*) FROM users")
+    count = cursor.fetchone()[0]
+
+    if count == 0:
+        cursor.execute("""
+            INSERT INTO users (name, email, password, role, department)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            "Admin",
+            "admin@iar.ac.in",
+            generate_password_hash("admin123"),
+            "admin",
+            "CSE"
+        ))
+        print("✅ Default admin created")
+
     conn.commit()
     conn.close()
 
@@ -110,7 +142,7 @@ def register():
             flash("Only college email allowed (@iar.ac.in) ❌")
             return redirect('/register')
 
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
         # Prevent duplicate email registrations
@@ -157,7 +189,7 @@ def login():
             return redirect('/login')
 
         # Database check
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email=?", (email,))
         user = cursor.fetchone()
@@ -178,8 +210,8 @@ def login():
             session['otp'] = otp
 
             # Email credentials (from Render)
-            sender_email = os.environ.get("EMAIL_USER")
-            sender_password = os.environ.get("EMAIL_PASS")
+            sender_email = os.environ.get("EMAIL_USER") or "jainmprajapati@gmail.com"
+            sender_password = os.environ.get("EMAIL_PASS") or "doxwasesbczzqtgi"
 
             try:
                 msg = MIMEText(
@@ -244,7 +276,7 @@ def create_event():
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Retrieve available venues for dropdown
@@ -318,7 +350,7 @@ def view_events():
     if 'user_id' not in session:
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Retrieve events accessible to user's department or generic Universal events
@@ -375,7 +407,7 @@ def register_event(event_id):
 
     student_id = session['user_id']
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Verify if user has already registered
@@ -421,7 +453,7 @@ def my_events():
         return redirect('/login')
 
     student_id = session['user_id']
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Query events specific to the authenticated student
@@ -478,7 +510,7 @@ def admin_events():
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Handle dual-role logic fetching corresponding events
@@ -527,7 +559,7 @@ def delete_event(event_id):
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("DELETE FROM events WHERE id=?", (event_id,))
@@ -542,7 +574,7 @@ def approve_event(event_id):
     if 'user_id' not in session or session['role'] != 'admin':
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("UPDATE events SET status='approved' WHERE id=?", (event_id,))
@@ -556,7 +588,7 @@ def view_participants(event_id):
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -576,7 +608,7 @@ def add_venue():
     if 'user_id' not in session or session['role'] != 'admin':
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     if request.method == 'POST':
@@ -598,7 +630,7 @@ def delete_venue():
         return redirect('/login')
 
     venue_id = request.form['venue_id']
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("DELETE FROM venues WHERE id = ?", (venue_id,))
@@ -628,7 +660,7 @@ def mark_attendance(event_id):
         return redirect('/login')
 
     student_id = session['user_id']
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -667,7 +699,7 @@ def view_attendance(event_id):
     if 'user_id' not in session:
         return redirect('/login')
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -688,7 +720,7 @@ def generate_certificate(event_id):
         return redirect('/login')
 
     student_id = session['user_id']
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Validate that the user actually attended before issuing certificate
@@ -734,7 +766,13 @@ def generate_certificate(event_id):
     return f"Certificate generated successfully ✅<br><a href='/{file_path}'>Download Certificate</a>"
 
 # Application Entry Point
+#if __name__ == '__main__':
+   # init_db()
+   # port = int(os.environ.get("PORT", 8000))
+  #  app.run(host="0.0.0.0", port=port)
+
 if __name__ == '__main__':
-    init_db()  # initialize your database (keep this if you need it)
-    port = int(os.environ.get("PORT", 8000))  # get port from environment or default to 8000
-    app.run(host="0.0.0.0", port=port)
+    print("Initializing database...")
+    init_db()   # ✅ MUST RUN
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)
