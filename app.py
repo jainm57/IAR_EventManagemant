@@ -5,6 +5,7 @@ import qrcode
 import sqlite3
 import random
 import smtplib
+import psycopg2
 from email.mime.text import MIMEText
 from flask import flash
 from reportlab.lib.styles import getSampleStyleSheet
@@ -22,20 +23,21 @@ print("🔥 DB PATH:", DB_PATH)
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-@app.before_request
-def before_request():
-    init_db()
+conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
+
+def get_db():
+    return psycopg2.connect(os.environ.get("DATABASE_URL"))
 
 def init_db():
-    print("🔥 Using DB:", DB_PATH)   # Debug line
+    print("🔥 Connecting to PostgreSQL...")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # USERS TABLE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT,
             email TEXT UNIQUE,
             password TEXT,
@@ -47,7 +49,7 @@ def init_db():
     # EVENTS TABLE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             title TEXT,
             description TEXT,
             date TEXT,
@@ -65,7 +67,7 @@ def init_db():
     # REGISTRATIONS
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS registrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             event_id INTEGER,
             student_id INTEGER
         )
@@ -74,7 +76,7 @@ def init_db():
     # VENUES
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS venues (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT,
             capacity INTEGER
         )
@@ -83,23 +85,22 @@ def init_db():
     # ATTENDANCE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             event_id INTEGER,
             student_id INTEGER
         )
     ''')
 
-    # ✅ COMMIT TABLE CREATION FIRST (IMPORTANT FIX)
     conn.commit()
 
-    # ✅ CHECK IF USER EXISTS (SAFE)
+    # ✅ CHECK IF ADMIN EXISTS
     cursor.execute("SELECT COUNT(*) FROM users")
     count = cursor.fetchone()[0]
 
     if count == 0:
         cursor.execute("""
             INSERT INTO users (name, email, password, role, department)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (
             "Admin",
             "admin@iar.ac.in",
@@ -110,6 +111,7 @@ def init_db():
         print("✅ Default admin created")
 
     conn.commit()
+    cursor.close()
     conn.close()
 
 @app.route('/')
@@ -137,42 +139,50 @@ def register():
         admin_code = request.form.get('admin_code')
         department = request.form['department']
 
-        # Validate college domain requirement
+        # Validate email
         if not re.match(r'^[a-zA-Z0-9._%+-]+@iar\.ac\.in$', email):
             flash("Only college email allowed (@iar.ac.in) ❌")
             return redirect('/register')
 
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        try:
+            # ✅ PostgreSQL connection
+            conn = get_db()
+            cursor = conn.cursor()
 
-        # Prevent duplicate email registrations
-        cursor.execute("SELECT * FROM users WHERE email=?", (email,))
-        existing_user = cursor.fetchone()
+            # ✅ FIXED QUERY (%s instead of ?)
+            cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
+            existing_user = cursor.fetchone()
 
-        if existing_user:
-            conn.close()
-            flash("Email already registered ❌")
-            return redirect('/register')
-
-        # Validate admin registration securely
-        if role == "admin":
-            # Note: In production, hardcoded secrets should be moved to environment variables
-            if admin_code != "12345":
+            if existing_user:
+                cursor.close()
                 conn.close()
-                flash("Invalid Admin Code ❌")
+                flash("Email already registered ❌")
                 return redirect('/register')
 
-        # Create new user record
-        cursor.execute(
-            "INSERT INTO users (name, email, password, role, department) VALUES (?, ?, ?, ?, ?)",
-            (name, email, password, role, department)
-        )
+            if role == "admin":
+                if admin_code != "12345":
+                    cursor.close()
+                    conn.close()
+                    flash("Invalid Admin Code ❌")
+                    return redirect('/register')
 
-        conn.commit()
-        conn.close()
+            # ✅ INSERT FIXED
+            cursor.execute(
+                "INSERT INTO users (name, email, password, role, department) VALUES (%s, %s, %s, %s, %s)",
+                (name, email, password, role, department)
+            )
 
-        flash("Registration Successful 🎉")
-        return redirect('/login')
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            flash("Registration Successful 🎉")
+            return redirect('/login')
+
+        except Exception as e:
+            print("❌ ERROR:", e)
+            flash("Something went wrong")
+            return redirect('/register')
 
     return render_template('register.html')
 
@@ -188,56 +198,63 @@ def login():
             flash("Use your college email (@iar.ac.in) ❌")
             return redirect('/login')
 
-        # Database check
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE email=?", (email,))
-        user = cursor.fetchone()
-        conn.close()
+        try:
+            # ✅ PostgreSQL connection
+            conn = get_db()
+            cursor = conn.cursor()
 
-        if user and check_password_hash(user[3], password):
+            # ✅ FIXED QUERY (%s instead of ?)
+            cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
+            user = cursor.fetchone()
 
-            # Generate OTP
-            otp = str(random.randint(100000, 999999))
+            cursor.close()
+            conn.close()
 
-            # Store session
-            session['temp_user'] = {
-                'id': user[0],
-                'role': user[4],
-                'department': user[5],
-                'email': email
-            }
-            session['otp'] = otp
+            if user and check_password_hash(user[3], password):
 
-            # Email credentials (from Render)
-            sender_email = os.environ.get("EMAIL_USER") or "jainmprajapati@gmail.com"
-            sender_password = os.environ.get("EMAIL_PASS") or "doxwasesbczzqtgi"
+                # Generate OTP
+                otp = str(random.randint(100000, 999999))
 
-            try:
-                msg = MIMEText(
-                    f"Hello {user[1]},\n\nYour OTP is: {otp}\n\nDo not share this code."
-                )
-                msg['Subject'] = 'IAR Event System - OTP Verification'
-                msg['From'] = sender_email
-                msg['To'] = email
+                session['temp_user'] = {
+                    'id': user[0],
+                    'role': user[4],
+                    'department': user[5],
+                    'email': email
+                }
+                session['otp'] = otp
 
-                # 🔥 Timeout added to prevent freezing
-                server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=5)
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
-                server.quit()
+                # ✅ Email (ENV + fallback)
+                sender_email = os.environ.get("EMAIL_USER") or "your_email@gmail.com"
+                sender_password = os.environ.get("EMAIL_PASS") or "your_app_password"
 
-                flash("Verification code sent to your email 📧")
+                try:
+                    msg = MIMEText(
+                        f"Hello {user[1]},\n\nYour OTP is: {otp}\n\nDo not share this code."
+                    )
+                    msg['Subject'] = 'IAR Event System - OTP Verification'
+                    msg['From'] = sender_email
+                    msg['To'] = email
 
-            except Exception as e:
-                print("Email error:", e)
-                flash("OTP generated but email delayed. Check again 🔄")
+                    server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
+                    server.login(sender_email, sender_password)
+                    server.send_message(msg)
+                    server.quit()
 
-            # 🔥 Always redirect (no blocking)
-            return redirect('/verify_otp')
+                    flash("Verification code sent to your email 📧")
 
-        else:
-            flash("Invalid Credentials ❌")
+                except Exception as e:
+                    print("Email error:", e)
+                    flash("OTP generated but email delayed. Check again 🔄")
+
+                return redirect('/verify_otp')
+
+            else:
+                flash("Invalid Credentials ❌")
+                return redirect('/login')
+
+        except Exception as e:
+            print("❌ ERROR:", e)
+            flash("Something went wrong")
             return redirect('/login')
 
     return render_template('login.html')
