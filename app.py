@@ -214,42 +214,11 @@ def login():
             conn.close()
 
             if user and check_password_hash(user[3], password):
-
-                # Generate OTP
-                otp = str(random.randint(100000, 999999))
-
-                session['temp_user'] = {
-                    'id': user[0],
-                    'role': user[4],
-                    'department': user[5],
-                    'email': email
-                }
-                session['otp'] = otp
-
-                # ✅ Email (ENV + fallback)
-                sender_email = os.environ.get("EMAIL_USER") or "your_email@gmail.com"
-                sender_password = os.environ.get("EMAIL_PASS") or "your_app_password"
-
-                try:
-                    msg = MIMEText(
-                        f"Hello {user[1]},\n\nYour OTP is: {otp}\n\nDo not share this code."
-                    )
-                    msg['Subject'] = 'IAR Event System - OTP Verification'
-                    msg['From'] = sender_email
-                    msg['To'] = email
-
-                    server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
-                    server.login(sender_email, sender_password)
-                    server.send_message(msg)
-                    server.quit()
-
-                    flash("Verification code sent to your email 📧")
-
-                except Exception as e:
-                    print("Email error:", e)
-                    flash(f"Email delayed: {str(e)}")
-
-                return redirect('/verify_otp')
+                session['user_id'] = user[0]
+                session['role'] = user[4]
+                session['department'] = user[5]
+                flash("Login Successful ✅")
+                return redirect('/')
 
             else:
                 flash("Invalid Credentials ❌")
