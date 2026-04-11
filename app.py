@@ -247,7 +247,7 @@ def login():
 
                 except Exception as e:
                     print("Email error:", e)
-                    flash("OTP generated but email delayed. Check again 🔄")
+                    flash(f"Email delayed: {str(e)}")
 
                 return redirect('/verify_otp')
 
