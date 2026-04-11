@@ -214,11 +214,19 @@ def login():
             conn.close()
 
             if user and check_password_hash(user[3], password):
-                session['user_id'] = user[0]
-                session['role'] = user[4]
-                session['department'] = user[5]
-                flash("Login Successful ✅")
-                return redirect('/')
+                # Generate OTP
+                otp = str(random.randint(100000, 999999))
+
+                session['temp_user'] = {
+                    'id': user[0],
+                    'role': user[4],
+                    'department': user[5],
+                    'email': email
+                }
+                session['otp'] = otp
+
+                flash(f"Verification code: {otp} 📧")
+                return redirect('/verify_otp')
 
             else:
                 flash("Invalid Credentials ❌")
