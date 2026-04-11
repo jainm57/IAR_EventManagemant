@@ -2,7 +2,7 @@ import re
 import os
 import time
 import qrcode
-import sqlite3
+
 import random
 import smtplib
 import psycopg2
@@ -13,17 +13,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from flask import Flask, render_template, request, redirect, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-if os.name == 'nt':  # Windows
-    DB_PATH = os.path.join(os.getcwd(), "database.db")
-else:  # Render (Linux)
-    DB_PATH = "/tmp/database.db"
-
-print("🔥 DB PATH:", DB_PATH)
-
 app = Flask(__name__)
 app.secret_key = "secret123"
-
-conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
 
 def get_db():
     return psycopg2.connect(os.environ.get("DATABASE_URL"))
@@ -293,7 +284,7 @@ def create_event():
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # Retrieve available venues for dropdown
@@ -323,14 +314,14 @@ def create_event():
             filepath = None
 
         # Derive capacity limit statically from the selected venue
-        cursor.execute("SELECT capacity FROM venues WHERE name=?", (venue,))
+        cursor.execute("SELECT capacity FROM venues WHERE name=%s", (venue,))
         venue_data = cursor.fetchone()
         max_participants = venue_data[0] if venue_data else None
 
         # Prevent double-booking venues during identical timeframes
         cursor.execute("""
             SELECT * FROM events
-            WHERE venue=? AND date=?
+            WHERE venue=%s AND date=%s
         """, (venue, date))
 
         existing_events = cursor.fetchall()
@@ -349,7 +340,7 @@ def create_event():
 
         # Construct and persist event record
         cursor.execute(
-            "INSERT INTO events (title, description, date, start_time, end_time, venue, organizer_id, max_participants, status, department, flyer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO events (title, description, date, start_time, end_time, venue, organizer_id, max_participants, status, department, flyer) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (title, description, date, start_time, end_time, venue, organizer_id, max_participants, 'pending', department, filepath)
         )
 
@@ -367,14 +358,14 @@ def view_events():
     if 'user_id' not in session:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # Retrieve events accessible to user's department or generic Universal events
     cursor.execute("""
         SELECT * FROM events 
         WHERE status='approved' 
-        AND (department=? OR department='Universal')
+        AND (department=%s OR department='Universal')
     """, (session['department'],))
 
     events = cursor.fetchall()
@@ -385,7 +376,7 @@ def view_events():
 
         # Calculate remaining capacity metrics
         cursor.execute(
-            "SELECT COUNT(*) FROM registrations WHERE event_id=?",
+            "SELECT COUNT(*) FROM registrations WHERE event_id=%s",
             (event_id,)
         )
         count = cursor.fetchone()[0]
@@ -424,12 +415,12 @@ def register_event(event_id):
 
     student_id = session['user_id']
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # Verify if user has already registered
     cursor.execute(
-        "SELECT * FROM registrations WHERE event_id=? AND student_id=?",
+        "SELECT * FROM registrations WHERE event_id=%s AND student_id=?",
         (event_id, student_id)
     )
     existing = cursor.fetchone()
@@ -440,13 +431,13 @@ def register_event(event_id):
 
     # Enforce venue capacity restrictions
     cursor.execute(
-        "SELECT max_participants FROM events WHERE id=?",
+        "SELECT max_participants FROM events WHERE id=%s",
         (event_id,)
     )
     event = cursor.fetchone()
 
     cursor.execute(
-        "SELECT COUNT(*) FROM registrations WHERE event_id=?",
+        "SELECT COUNT(*) FROM registrations WHERE event_id=%s",
         (event_id,)
     )
     current_count = cursor.fetchone()[0]
@@ -456,7 +447,7 @@ def register_event(event_id):
         return "Event is full ❌"
 
     cursor.execute(
-        "INSERT INTO registrations (event_id, student_id) VALUES (?, ?)",
+        "INSERT INTO registrations (event_id, student_id) VALUES (%s, %s)",
         (event_id, student_id)
     )
     conn.commit()
@@ -470,7 +461,7 @@ def my_events():
         return redirect('/login')
 
     student_id = session['user_id']
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # Query events specific to the authenticated student
@@ -478,7 +469,7 @@ def my_events():
         SELECT events.*
         FROM events
         JOIN registrations ON events.id = registrations.event_id
-        WHERE registrations.student_id = ?
+        WHERE registrations.student_id = %s
     """, (student_id,))
 
     events = cursor.fetchall()
@@ -488,7 +479,7 @@ def my_events():
         event_id = event[0]
 
         cursor.execute(
-            "SELECT COUNT(*) FROM registrations WHERE event_id=?",
+            "SELECT COUNT(*) FROM registrations WHERE event_id=%s",
             (event_id,)
         )
         count = cursor.fetchone()[0]
@@ -527,14 +518,14 @@ def admin_events():
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # Handle dual-role logic fetching corresponding events
     if session['role'] == 'admin':
         cursor.execute("SELECT * FROM events")
     else:
-        cursor.execute("SELECT * FROM events WHERE organizer_id=?", (session['user_id'],))
+        cursor.execute("SELECT * FROM events WHERE organizer_id=%s", (session['user_id'],))
 
     events = cursor.fetchall()
     event_list = []
@@ -542,7 +533,7 @@ def admin_events():
     for event in events:
         event_id = event[0]
 
-        cursor.execute("SELECT COUNT(*) FROM registrations WHERE event_id=?", (event_id,))
+        cursor.execute("SELECT COUNT(*) FROM registrations WHERE event_id=%s", (event_id,))
         count = cursor.fetchone()[0]
         max_participants = int(event[6]) if event[6] else None
 
@@ -576,10 +567,10 @@ def delete_event(event_id):
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM events WHERE id=?", (event_id,))
+    cursor.execute("DELETE FROM events WHERE id=%s", (event_id,))
     conn.commit()
     conn.close()
 
@@ -591,10 +582,10 @@ def approve_event(event_id):
     if 'user_id' not in session or session['role'] != 'admin':
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("UPDATE events SET status='approved' WHERE id=?", (event_id,))
+    cursor.execute("UPDATE events SET status='approved' WHERE id=%s", (event_id,))
     conn.commit()
     conn.close()
 
@@ -605,7 +596,7 @@ def view_participants(event_id):
     if 'user_id' not in session or session['role'] not in ['admin', 'organizer']:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -625,14 +616,14 @@ def add_venue():
     if 'user_id' not in session or session['role'] != 'admin':
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     if request.method == 'POST':
         name = request.form['name']
         capacity = request.form['capacity']
 
-        cursor.execute("INSERT INTO venues (name, capacity) VALUES (?, ?)", (name, capacity))
+        cursor.execute("INSERT INTO venues (name, capacity) VALUES (%s, %s)", (name, capacity))
         conn.commit()
 
     cursor.execute("SELECT * FROM venues")
@@ -647,10 +638,10 @@ def delete_venue():
         return redirect('/login')
 
     venue_id = request.form['venue_id']
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM venues WHERE id = ?", (venue_id,))
+    cursor.execute("DELETE FROM venues WHERE id = %s", (venue_id,))
     conn.commit()
     conn.close()
 
@@ -677,12 +668,12 @@ def mark_attendance(event_id):
         return redirect('/login')
 
     student_id = session['user_id']
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT * FROM registrations 
-        WHERE event_id=? AND student_id=?
+        WHERE event_id=%s AND student_id=?
     """, (event_id, student_id))
 
     registered = cursor.fetchone()
@@ -694,7 +685,7 @@ def mark_attendance(event_id):
 
     cursor.execute("""
         SELECT * FROM attendance 
-        WHERE event_id=? AND student_id=?
+        WHERE event_id=%s AND student_id=?
     """, (event_id, student_id))
 
     if cursor.fetchone():
@@ -703,7 +694,7 @@ def mark_attendance(event_id):
 
     cursor.execute("""
         INSERT INTO attendance (event_id, student_id)
-        VALUES (?, ?)
+        VALUES (%s, %s)
     """, (event_id, student_id))
 
     conn.commit()
@@ -716,7 +707,7 @@ def view_attendance(event_id):
     if 'user_id' not in session:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -737,13 +728,13 @@ def generate_certificate(event_id):
         return redirect('/login')
 
     student_id = session['user_id']
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
 
     # Validate that the user actually attended before issuing certificate
     cursor.execute("""
         SELECT * FROM attendance
-        WHERE event_id=? AND student_id=?
+        WHERE event_id=%s AND student_id=?
     """, (event_id, student_id))
 
     attendance = cursor.fetchone()
@@ -752,10 +743,10 @@ def generate_certificate(event_id):
         conn.close()
         return "You did not attend this event ❌"
 
-    cursor.execute("SELECT name FROM users WHERE id=?", (student_id,))
+    cursor.execute("SELECT name FROM users WHERE id=%s", (student_id,))
     user = cursor.fetchone()
 
-    cursor.execute("SELECT title, date FROM events WHERE id=?", (event_id,))
+    cursor.execute("SELECT title, date FROM events WHERE id=%s", (event_id,))
     event = cursor.fetchone()
 
     conn.close()
