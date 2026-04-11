@@ -105,6 +105,18 @@ def init_db():
     cursor.close()
     conn.close()
 
+
+init_done = False
+@app.before_request
+def auto_init():
+    global init_done
+    if not init_done:
+        try:
+            init_db()
+        except:
+            pass
+        init_done = True
+
 @app.route('/')
 def home():
     # Route users to their specific dashboards based on role
