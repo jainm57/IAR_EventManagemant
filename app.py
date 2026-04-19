@@ -373,7 +373,7 @@ def view_events():
         )
         count = cursor.fetchone()[0]
 
-        max_participants = int(event[6]) if event[6] else None
+        max_participants = int(event[8]) if event[8] else None
 
         if max_participants:
             seats_left = max_participants - count
@@ -386,9 +386,9 @@ def view_events():
             "title": event[1],
             "description": event[2],
             "date": event[3],
-            "venue": event[4],
-            "start_time": event[8],
-            "end_time": event[9],
+            "venue": event[6],
+            "start_time": event[4],
+            "end_time": event[5],
             "max": max_participants,
             "count": count,
             "seats_left": seats_left,
@@ -475,7 +475,7 @@ def my_events():
             (event_id,)
         )
         count = cursor.fetchone()[0]
-        max_participants = int(event[6]) if event[6] else None
+        max_participants = int(event[8]) if event[8] else None
 
         if max_participants:
             seats_left = max_participants - count
@@ -487,9 +487,9 @@ def my_events():
             "title": event[1],
             "description": event[2],
             "date": event[3],
-            "venue": event[4],
-            "start_time": event[8],
-            "end_time": event[9],
+            "venue": event[6],
+            "start_time": event[4],
+            "end_time": event[5],
             "max": max_participants,
             "count": count,
             "seats_left": seats_left,
@@ -527,7 +527,7 @@ def admin_events():
 
         cursor.execute("SELECT COUNT(*) FROM registrations WHERE event_id=%s", (event_id,))
         count = cursor.fetchone()[0]
-        max_participants = int(event[6]) if event[6] else None
+        max_participants = int(event[8]) if event[8] else None
 
         if max_participants:
             seats_left = max_participants - count
@@ -539,13 +539,13 @@ def admin_events():
             "title": event[1],
             "description": event[2],
             "date": event[3],
-            "venue": event[4],           
-            "start_time": event[8],      
-            "end_time": event[9],        
-            "max": event[6],             
+            "venue": event[6],           
+            "start_time": event[4],      
+            "end_time": event[5],        
+            "max": event[8],             
             "count": count,
             "seats_left": seats_left,
-            "status": event[7],          
+            "status": event[9],          
             "department": event[10], 
             "flyer": event[11]      
         })
