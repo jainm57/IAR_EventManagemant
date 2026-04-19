@@ -772,12 +772,16 @@ def generate_certificate(event_id):
   #  app.run(host="0.0.0.0", port=port)
 
 import traceback
+from werkzeug.exceptions import HTTPException
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    # Pass through standard HTTP errors
+    if isinstance(e, HTTPException):
+        return e
     # Print the exception to the UI for quick debugging
     tb = traceback.format_exc()
-    return f"<h1>Internal Server Error</h1><pre>{tb}</pre>", 500
+    return f"<h1>Internal Error Occurred</h1><pre>{tb}</pre>", 500
 
 if __name__ == '__main__':
     print("Initializing database...")
