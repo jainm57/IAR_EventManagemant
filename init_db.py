@@ -4,7 +4,10 @@ import psycopg2
 def init_db():
     print("🔥 Connecting to PostgreSQL to initialize tables...")
     try:
-        conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
+            raise ValueError("DATABASE_URL environment variable is missing. On Railway, make sure you created a DATABASE_URL variable set to ${{ Postgres.DATABASE_URL }}")
+        conn = psycopg2.connect(db_url)
         cursor = conn.cursor()
 
         # USERS TABLE

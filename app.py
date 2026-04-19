@@ -17,7 +17,10 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 
 def get_db():
-    return psycopg2.connect(os.environ.get("DATABASE_URL"))
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is missing. On Railway, make sure you created a DATABASE_URL variable set to ${{ Postgres.DATABASE_URL }}")
+    return psycopg2.connect(db_url)
 
 def init_db():
     print("🔥 Connecting to PostgreSQL...")
@@ -409,7 +412,7 @@ def register_event(event_id):
 
     # Verify if user has already registered
     cursor.execute(
-        "SELECT * FROM registrations WHERE event_id=%s AND student_id=?",
+        "SELECT * FROM registrations WHERE event_id=%s AND student_id=%s",
         (event_id, student_id)
     )
     existing = cursor.fetchone()
@@ -592,7 +595,7 @@ def view_participants(event_id):
         SELECT users.name, users.email
         FROM registrations
         JOIN users ON registrations.student_id = users.id
-        WHERE registrations.event_id = ?
+        WHERE registrations.event_id = %s
     """, (event_id,))
 
     participants = cursor.fetchall()
@@ -662,7 +665,7 @@ def mark_attendance(event_id):
 
     cursor.execute("""
         SELECT * FROM registrations 
-        WHERE event_id=%s AND student_id=?
+        WHERE event_id=%s AND student_id=%s
     """, (event_id, student_id))
 
     registered = cursor.fetchone()
@@ -674,7 +677,7 @@ def mark_attendance(event_id):
 
     cursor.execute("""
         SELECT * FROM attendance 
-        WHERE event_id=%s AND student_id=?
+        WHERE event_id=%s AND student_id=%s
     """, (event_id, student_id))
 
     if cursor.fetchone():
@@ -703,7 +706,7 @@ def view_attendance(event_id):
         SELECT users.name, users.email
         FROM attendance
         JOIN users ON attendance.student_id = users.id
-        WHERE attendance.event_id=?
+        WHERE attendance.event_id=%s
     """, (event_id,))
 
     data = cursor.fetchall()
@@ -723,7 +726,7 @@ def generate_certificate(event_id):
     # Validate that the user actually attended before issuing certificate
     cursor.execute("""
         SELECT * FROM attendance
-        WHERE event_id=%s AND student_id=?
+        WHERE event_id=%s AND student_id=%s
     """, (event_id, student_id))
 
     attendance = cursor.fetchone()
@@ -767,6 +770,14 @@ def generate_certificate(event_id):
    # init_db()
    # port = int(os.environ.get("PORT", 8000))
   #  app.run(host="0.0.0.0", port=port)
+
+import traceback
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Print the exception to the UI for quick debugging
+    tb = traceback.format_exc()
+    return f"<h1>Internal Server Error</h1><pre>{tb}</pre>", 500
 
 if __name__ == '__main__':
     print("Initializing database...")
